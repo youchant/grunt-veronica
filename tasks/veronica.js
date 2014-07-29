@@ -325,6 +325,15 @@ module.exports = function (grunt) {
             });
             grunt.file.write(options.cssTarget + '/modules.css', allStyleStream);
 
+            var cssComboOptions = {files:{}};
+            cssComboOptions.files[options.cssTarget + '/modules.css'] =
+                grunt.
+            grunt.config('css_combo:all', {
+                files: {
+                  
+                }
+            });
+
             grunt.task.run('clean:widgets');
         });
 
