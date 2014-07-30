@@ -24,8 +24,8 @@ module.exports = function (grunt) {
             merge: [],
             clean: [],
             buildPaths: {},
-            cssPack: "", // all, module, none
-            cssTarget: './test/target/app/styles'
+            cssPack: "all", // all, module, none
+            cssTarget: ''
         });
 
         var _ = require('underscore');
@@ -87,6 +87,7 @@ module.exports = function (grunt) {
                     var dirs = fs.readdirSync(origin);
 
                     _.each(dirs, function (dir) {
+                        // 排除不是部件文件夹的目录
                         if (_.indexOf(fs.readdirSync(origin + '/' + dir), 'main.js') < 0) {
                             subSource.push(dir);
                         }
@@ -267,15 +268,9 @@ module.exports = function (grunt) {
 
                 var thisStyles = grunt.file.expand([source.origin + '/**/*.css', '!' + source.origin + '/**/*.min.css']);
                 //var thisStyles = grunt.file.expand(['./test/**/*.css', '!' + './test/**/*.min.css']);
-                widgetStyles = widgetStyles.push(thisStyles);
+                widgetStyles.push(thisStyles);
 
                 grunt.config('requirejs.widget' + i, { options: options });
-
-                // 将该源下的所有css合并到一个css里，合并css文件的路径是：源路径 + /styles/all.css
-                grunt.config('concat.widget' + i, {
-                    src: [source.origin + '/**/*.css', '!' + source.origin + '/**/*.min.css'],
-                    dest: source.target + '/styles/all.css'
-                });
 
                 grunt.config('clean.widget' + i, {
                     src: [
@@ -300,8 +295,6 @@ module.exports = function (grunt) {
 
                 // 压缩该目录下所有插件
                 grunt.task.run('requirejs:widget' + i);
-                // 合并该目录下所有CSS文件（解决在IE下31个样式表限制问题）
-                grunt.task.run('concat:widget' + i);
                 // 清理
                 grunt.task.run('clean:widget' + i);
                 // 拷贝部件
@@ -310,29 +303,36 @@ module.exports = function (grunt) {
             });
 
             var allStyleStream = '';
+            var cssComboOptions = { files: {} };
+            var cssTarget = options.cssTarget;
+            var fs = require('fs');
+
             _.each(widgetStyles, function (styles, idx) {
+                var stream = '';
+                _.each(styles, function (style) {
+                    stream += '@import "' + helper.getRelativePath('./', style, cssTarget) + '";\n';
+                });
+
                 if (options.cssPack === "module") {
-                    var stream = '';
-                    _.each(styles, function (style) {
-                        stream += '@import "' + style + '";\n';
-                    });
-                    grunt.file.write(options.cssTarget + '/module' + idx + '.css', stream);
+                    grunt.file.write(options.cssTarget + '/modules/module' + idx + '.css', stream);
                 } else {
-                    _.each(styles, function (style) {
-                        allStyleStream += '@import "' + style + '";\n';
-                    });
+                    allStyleStream += stream;
                 }
             });
+
             grunt.file.write(options.cssTarget + '/modules.css', allStyleStream);
 
-            var cssComboOptions = {files:{}};
-            cssComboOptions.files[options.cssTarget + '/modules.css'] =
-                grunt.
-            grunt.config('css_combo:all', {
-                files: {
-                  
-                }
-            });
+            if (options.cssPack === 'all') {
+                cssComboOptions.files[cssTarget + '/modules.css'] = [cssTarget + '/modules.css'];
+            }
+            //if (options.cssPack === 'module') {
+            //    cssComboOptions.files[cssTarget + '/modules.css'] = _.map(fs.readdirSync(cssTarget + '/modules'),
+            //        function (fileName) {
+            //            return cssTarget + '/modules/' + fileName;
+            //        });
+            //}
+
+            grunt.config('css_combo.all', cssComboOptions);
 
             grunt.task.run('clean:widgets');
         });
@@ -342,7 +342,7 @@ module.exports = function (grunt) {
             grunt.task.run('site');
             grunt.task.run('widgets');
             //// grunt.task.run('pages');
-            //grunt.task.run('css_combo');
+            grunt.task.run('css_combo:all');
             grunt.task.run('clean:main');
             grunt.task.run('clean:others');
 

@@ -1,6 +1,0 @@
-@import "./test/origin/app/modules/modA/widgets/test/styles/main.css";
-@import "./test/origin/app/modules/modA/widgets/test/styles/view1.css";
-@import "./test/target/app/modules/modA/widgets/test/styles/main.css";
-@import "./test/target/app/modules/modA/widgets/test/styles/view1.css";
-@import "./test/target/app/widgets/styles/all.css";
-@import "./test/target/app/widgets/test/main.css";

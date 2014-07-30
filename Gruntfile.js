@@ -44,7 +44,8 @@ module.exports = function (grunt) {
                 options: {
                     reqConfig: reqConf,
                     modules: build.modules,
-                    solution: solutionPath
+                    solution: solutionPath,
+                    cssTarget: './test/target/app/styles'
                 }
             }
         },
