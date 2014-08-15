@@ -10,67 +10,90 @@
 
 module.exports = function (grunt) {
 
-    // Please see the Grunt documentation for more information regarding task
-    // creation: http://gruntjs.com/creating-tasks
-
     grunt.registerMultiTask('veronica', 'build veronica project', function () {
-        // Merge task-specific and/or target-specific options with these defaults.
+
         var options = this.options({
+            appDir: '',
+            baseUrl: '',
+            dir: '',
+            entry: 'main',
             reqConfig: '',
             modules: [],
             optimize: "none", // uglify
             solution: '',
-            notMerge: [],
             merge: [],
+            notMerge: [],
             clean: [],
             buildPaths: {},
             cssPack: "all", // all, module, none
-            cssTarget: ''
+            removeCombined: true,
+            cssTarget: this.data.options.dir + '/styles'
         });
 
         var _ = require('underscore');
         var path = require('path');
         var reqConf = options.reqConfig;
+        var defaultSubPaths = ['widgets', 'plugins'];
 
-        var appBasePath = path.join(reqConf.appDir, reqConf.baseUrl);
-
+        // åº”ç”¨ç¨‹åºåŸºè·¯å¾„
+        var appBasePath = path.join(options.appDir, options.baseUrl);
+        var appTargetBasePath = path.join(options.dir, options.baseUrl);
         var helper = {
-            // ¸ù¾İÄ£¿éÉú³ÉËùÓĞµÄÔ´ÅäÖÃ
+            // æ ¹æ®æ¨¡å—ç”Ÿæˆæ‰€æœ‰çš„æºé…ç½®
             getSourcesFromModules: function (modules, reqConf) {
                 var sources = [];
-                var createSource = function (module, type) {
+
+                var createSource = function (module, subpath, type) {
                     return {
-                        origin: path.join(reqConf.appDir, reqConf.baseUrl, module.source, module.name, type),
-                        target: path.join(reqConf.dir, reqConf.baseUrl, type + '/temp', module.name),
-                        copy: path.join(reqConf.dir, reqConf.baseUrl, type),
+                        // åŸå§‹è·¯å¾„
+                        origin: path.join(options.appDir, options.baseUrl, module.source, module.name, subpath),
+                        // æ‰“åŒ…è¿‡ç¨‹ä¸­çš„ç›®æ ‡è·¯å¾„
+                        target: path.join(options.dir, options.baseUrl, subpath + '/__temp__', module.name),
+                        // æœ€ç»ˆæ”¾ç½®çš„è·¯å¾„
+                        copy: path.join(options.dir, options.baseUrl, type),
+                        // ç±»å‹
                         type: type
                     };
                 }
+
                 _.each(modules, function (module) {
-                    sources.push(createSource(module, 'widgets'));
-                    sources.push(createSource(module, 'plugins'));
+                    var subpaths = defaultSubPaths;
+                    if (module.subpaths) {
+                        subpaths = subpaths.concat(module.subpaths);
+                    }
+
+                    _.each(subpaths, function (subpath) {
+                        var type = _.find(defaultSubPaths, function (p) {
+                            return subpath.indexOf(p) >= 0;
+                        });
+
+                        sources.push(createSource(module, subpath, type));
+                    });
                 });
 
                 return sources;
             },
-            // »ñÈ¡Ïà¶ÔÓÚÄ³¸ö»ùÂ·¾¶µÄÕæÊµÂ·¾¶
+            // è·å–ç›¸å¯¹äºæŸä¸ªåŸºè·¯å¾„çš„çœŸå®è·¯å¾„
             getRelativePath: function (originBasePath, originPath, currBasePath) {
-                // Êµ¼ÊÂ·¾¶
+                // å®é™…è·¯å¾„
                 var truePath = path.join(originBasePath, originPath);
-                var dep = 10;  // Éè¶¨×î¶àÏòÉÏ²éÕÒ10´Î
-                // Èç¹û»ùÂ·¾¶²»ÔÚÓ¦ÓÃ³ÌĞòÂ·¾¶ÖĞ£¬Ôò¸½¼ÓÓ¦ÓÃ³ÌĞòÂ·¾¶
-                if (path.join(currBasePath, originPath).indexOf(path.join(reqConf.appDir)) < 0) {
+                var dep = 10;  // è®¾å®šæœ€å¤šå‘ä¸ŠæŸ¥æ‰¾10æ¬¡
+
+                console.log(path.join(currBasePath, originPath));
+                console.log(path.join(originBasePath));
+                // å¦‚æœåŸºè·¯å¾„ä¸åœ¨åº”ç”¨ç¨‹åºè·¯å¾„ä¸­ï¼Œåˆ™é™„åŠ åº”ç”¨ç¨‹åºè·¯å¾„
+                if (path.join(originBasePath) !== '.\\' && path.join(currBasePath, originPath).indexOf(path.join(originBasePath)) < 0) {
                     originPath = path.join(appBasePath, originPath);
                 }
-
+                console.log(originPath);
                 while (truePath !== path.join(currBasePath, originPath) && dep !== 0) {
                     originPath = path.join('../', originPath);
                     dep--;
                 }
                 return originPath;
             },
-            // »ñÈ¡Ä³¸ö²¿¼şÔ´Ä¿Â¼ÏÂµÄËùÓĞ²¿¼ş£¬²¢ÎªÃ¿¸ö²¿¼şÉú³É RequireJS µÄÄ£¿éÅäÖÃ
-            // ²ÎÊı£º£¨ËùÓĞÔ´Â·¾¶£©
+            // è·å–æŸä¸ªéƒ¨ä»¶æºç›®å½•ä¸‹çš„æ‰€æœ‰éƒ¨ä»¶ï¼Œå¹¶ä¸ºæ¯ä¸ªéƒ¨ä»¶ç”Ÿæˆ RequireJS çš„æ¨¡å—é…ç½®
+            // å‚æ•°ï¼šï¼ˆæ‰€æœ‰æºè·¯å¾„ï¼‰
             getReqModulesAndPathsFromSources: function (sources) {
                 var widgetsRefPath = {};
                 var modules = _.map(sources, function (source) { // source: { origin, target }
@@ -81,24 +104,24 @@ module.exports = function (grunt) {
                         return false;
                     }
 
-                    var subSource = [];  // ²»ÊÇ²¿¼şÎÄ¼ş¼Ğ
+                    var subSource = [];  // ä¸æ˜¯éƒ¨ä»¶æ–‡ä»¶å¤¹
 
-                    // ÕÒµ½ËùÓĞÎÄ¼ş¼ĞÃû³Æ
+                    // æ‰¾åˆ°æ‰€æœ‰æ–‡ä»¶å¤¹åç§°
                     var dirs = fs.readdirSync(origin);
-
                     _.each(dirs, function (dir) {
-                        // ÅÅ³ı²»ÊÇ²¿¼şÎÄ¼ş¼ĞµÄÄ¿Â¼
+                        // æ’é™¤ä¸æ˜¯éƒ¨ä»¶æ–‡ä»¶å¤¹çš„ç›®å½•
                         if (_.indexOf(fs.readdirSync(origin + '/' + dir), 'main.js') < 0) {
                             subSource.push(dir);
                         }
                     });
 
-                    var result = _.map(_.reject(dirs, function (dir) {
-                        // ÅÅ³ıÌØÊâµÄÎÄ¼ş£¨¼Ğ£©Ãû³ÆºÍÆäËûÔ´Â·¾¶Ãû³Æ
+                    var clearedDirs = _.reject(dirs, function (dir) {
+                        // æ’é™¤ç‰¹æ®Šçš„æ–‡ä»¶ï¼ˆå¤¹ï¼‰åç§°å’Œå…¶ä»–æºè·¯å¾„åç§°
                         return _.find(['.css', '.js', '.DS_Store', 'styles'].concat(subSource), function (tag) {
                             return dir.indexOf(tag) > -1;
                         });
-                    }), function (dir) {
+                    });
+                    var result = _.map(clearedDirs, function (dir) {
 
                         widgetsRefPath[dir] = 'empty:';
                         _.each(['main', 'styles', 'views', 'templates'], function (name) {
@@ -116,11 +139,11 @@ module.exports = function (grunt) {
                     return result;
                 });
                 return {
-                    modules: modules,
-                    paths: widgetsRefPath
+                    modules: modules,  // éƒ¨ä»¶çš„ modules é…ç½®
+                    paths: widgetsRefPath  // éƒ¨ä»¶çš„ path é…ç½®
                 }
             },
-            // »ñÈ¡ËùÓĞÔ´µÄReqÅäÖÃ
+            // ä¸ºæ¯ä¸ªsourceç”ŸæˆReqé…ç½®
             getSourcesReqConfig: function (sources, modulesConfig, options) {
                 var widgetModules = modulesConfig.modules;
                 var widgetRefPaths = modulesConfig.paths;
@@ -132,7 +155,7 @@ module.exports = function (grunt) {
                     var widgetPackages = [];
                     var modules = widgetModules[index];
 
-                    // ½âÎöÒÔÏÂ¼¸¸öÎÄ¼şÏà¶ÔÓÚ²¿¼şÎÄ¼ş¼ĞµÄÕıÈ·Â·¾¶ ['text', 'css', 'normalize', 'css-builder']
+                    // è§£æä»¥ä¸‹å‡ ä¸ªæ–‡ä»¶ç›¸å¯¹äºéƒ¨ä»¶æ–‡ä»¶å¤¹çš„æ­£ç¡®è·¯å¾„ ['text', 'css', 'normalize', 'css-builder']
                     // reqConf.paths
 
                     _.each(reqConf.paths, function (path, pathName) {
@@ -159,38 +182,48 @@ module.exports = function (grunt) {
             }
         };
 
-        var sources = helper.getSourcesFromModules(options.modules, reqConf);
-        var reqModuleConfigsAndPaths = helper.getReqModulesAndPathsFromSources(sources);
-        var sourcesReqConfig = helper.getSourcesReqConfig(sources, reqModuleConfigsAndPaths, options);
-        var solutionPath = helper.getRelativePath('./', options.solution, appBasePath);
-        var moduleInclude = _.map(options.modules, function (mod) {
-            return mod.source + '/' + mod.name + '/main';
+        // è§£å†³æ–¹æ¡ˆæ–‡ä»¶è·¯å¾„
+        var solutionPath = options.solution === '' ? '' : helper.getRelativePath('./', options.solution, appTargetBasePath);
+        var baseInclude = solutionPath === '' ? [] : [solutionPath];
+        // å°†æ¯ä¸ª module çš„ä¸»æ–‡ä»¶åŒ…å«åœ¨ç«™ç‚¹ä¸»æ–‡ä»¶ä¸­
+        var moduleInclude = _.compact(_.map(options.modules, function (mod) {
+            if (mod.name === '.') return false;
+            // return mod.source + '/' + mod.name + '/main';
+            return helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appTargetBasePath);
+        }));
+        // ç«™ç‚¹çš„ path é…ç½®
+        var sitePaths = {};
+        _.each(reqConf.paths, function (path, pathName) {
+            if (_.contains(options.notMerge, pathName)) {
+                sitePaths[pathName] = 'empty:';
+            } else {
+                sitePaths[pathName] = path;
+            }
         });
-
         var defaultSiteOptions = {
-            appDir: reqConf.appDir,
-            baseUrl: reqConf.baseUrl,
-            dir: reqConf.dir,
+            appDir: options.appDir,
+            baseUrl: options.baseUrl,
+            dir: options.dir,
             modules: [{
-                name: 'main', include: [solutionPath]
-                  .concat(options.merge)
-                  .concat(moduleInclude)
+                name: options.entry,
+                include: baseInclude.concat(options.merge).concat(moduleInclude)
             }],
-            paths: reqConf.paths || {},
+            paths: sitePaths,
             shim: reqConf.shim || {},
             packages: reqConf.packages || [],
             optimize: options.optimize,
             onBuildRead: function (moduleName, path, contents) {
+                console.log(moduleName);
                 if (moduleName.indexOf('require-conf') > -1) {
                     return contents.replace(/debug\s*\:\s*(true|false)/g, 'debug: false, optimized: true');
                 }
-                if (moduleName === 'main') {
+                if (solutionPath !== '' && moduleName === 'main') {
                     return 'window.verSolution="' + solutionPath + '";\n' + contents;
                 }
                 return contents;
             },
             preserveLicenseComments: false,
-            removeCombined: true,
+            removeCombined: options.removeCombined,
             fileExclusionRegExp: /^\./
         };
 
@@ -203,7 +236,7 @@ module.exports = function (grunt) {
             fileExclusionRegExp: /^\./,
             separateCSS: true,
             onBuildWrite: function (moduleName, path, contents) {
-                // Bugfixed£ºµ±ÔÚÎ´ÖªµÄÇé¿öÏÂ£¬ÓĞ¿ÉÄÜ»á³öÏÖÊ¶±ğ²»ÁË²¿¼şµÄÇé¿ö
+                // Bugfixedï¼šå½“åœ¨æœªçŸ¥çš„æƒ…å†µä¸‹ï¼Œæœ‰å¯èƒ½ä¼šå‡ºç°è¯†åˆ«ä¸äº†éƒ¨ä»¶çš„æƒ…å†µ
                 var packageName = moduleName.substring(0, moduleName.indexOf('/main'));
                 if (packageName.length > 0) {
                     return contents + "\ndefine('" + packageName + "', ['" + moduleName + "'], function (main) { return main; });";
@@ -213,9 +246,9 @@ module.exports = function (grunt) {
         };
 
         grunt.initConfig({
-            // ÈÎÎñÅäÖÃ
+            // ä»»åŠ¡é…ç½®
             requirejs: {
-                // µ¥¸öÍøÕ¾
+                // å•ä¸ªç½‘ç«™
                 site: {
                     options: defaultSiteOptions
                 },
@@ -230,14 +263,14 @@ module.exports = function (grunt) {
             },
             copy: { main: {} },
             clean: {
-                // TODO: ÕâÀïĞ´ËÀÁËÒ»Ğ©Â·¾¶£¬Ğè¿¼ÂÇÒ»ÖÖ¸üÓÅÑÅµÄ·½Ê½
+                // TODO: è¿™é‡Œå†™æ­»äº†ä¸€äº›è·¯å¾„ï¼Œéœ€è€ƒè™‘ä¸€ç§æ›´ä¼˜é›…çš„æ–¹å¼
                 main: [
-                   reqConf.dir + '/**/*.less',
-                   reqConf.dir + '/**/build.txt'
+                   options.dir + '/**/*.less',
+                   options.dir + '/**/build.txt'
                 ],
-                output: [reqConf.dir],
+                output: [options.dir],
                 others: options.clean,
-                widgets: [reqConf.dir + '/widgets/temp', reqConf.dir + '/plugins/temp']
+                widgets: [options.dir + '/**/__temp__']
             },
             css_combo: {
                 main: {
@@ -257,12 +290,16 @@ module.exports = function (grunt) {
         grunt.registerTask('site', ['requirejs:site']);
 
         grunt.registerTask('widgets', function () {
+            var sources = helper.getSourcesFromModules(options.modules, reqConf);
+            var reqModuleConfigsAndPaths = helper.getReqModulesAndPathsFromSources(sources);
+            var sourcesReqConfig = helper.getSourcesReqConfig(sources, reqModuleConfigsAndPaths, options);
+
             var widgetStyles = [];
 
-            // ·Ö±ğÎªÃ¿¸ö²¿¼şÔ´½øĞĞ´ò°ü
+            // åˆ†åˆ«ä¸ºæ¯ä¸ªéƒ¨ä»¶æºè¿›è¡Œæ‰“åŒ…
             _.each(sources, function (source, i) {
 
-                if (!sourcesReqConfig[i].modules) return;
+                if (sourcesReqConfig[i].modules === false) return;
 
                 var options = _.extend({}, grunt.config('requirejs.widget.options'), sourcesReqConfig[i]);
 
@@ -293,11 +330,11 @@ module.exports = function (grunt) {
                     // filter: 'isFile'
                 })
 
-                // Ñ¹Ëõ¸ÃÄ¿Â¼ÏÂËùÓĞ²å¼ş
+                // å‹ç¼©è¯¥ç›®å½•ä¸‹æ‰€æœ‰æ’ä»¶
                 grunt.task.run('requirejs:widget' + i);
-                // ÇåÀí
+                // æ¸…ç†
                 grunt.task.run('clean:widget' + i);
-                // ¿½±´²¿¼ş
+                // æ‹·è´éƒ¨ä»¶
                 grunt.task.run('copy:widget' + i);
 
             });
@@ -320,17 +357,21 @@ module.exports = function (grunt) {
                 }
             });
 
-            grunt.file.write(options.cssTarget + '/modules.css', allStyleStream);
+            if (allStyleStream !== '') {
+                grunt.file.write(options.cssTarget + '/modules.css', allStyleStream);
 
-            if (options.cssPack === 'all') {
-                cssComboOptions.files[cssTarget + '/modules.css'] = [cssTarget + '/modules.css'];
+                if (options.cssPack === 'all') {
+                    cssComboOptions.files[cssTarget + '/modules.css'] = [cssTarget + '/modules.css'];
+                }
+                //if (options.cssPack === 'module') {
+                //    cssComboOptions.files[cssTarget + '/modules.css'] = _.map(fs.readdirSync(cssTarget + '/modules'),
+                //        function (fileName) {
+                //            return cssTarget + '/modules/' + fileName;
+                //        });
+                //}
             }
-            //if (options.cssPack === 'module') {
-            //    cssComboOptions.files[cssTarget + '/modules.css'] = _.map(fs.readdirSync(cssTarget + '/modules'),
-            //        function (fileName) {
-            //            return cssTarget + '/modules/' + fileName;
-            //        });
-            //}
+
+
 
             grunt.config('css_combo.all', cssComboOptions);
 
