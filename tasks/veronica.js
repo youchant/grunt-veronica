@@ -37,6 +37,7 @@ module.exports = function (grunt) {
 
         // 应用程序基路径
         var appBasePath = path.join(options.appDir, options.baseUrl);
+        // 目标应用程序基路径
         var appTargetBasePath = path.join(options.dir, options.baseUrl);
         var helper = {
             // 根据模块生成所有的源配置
@@ -79,13 +80,10 @@ module.exports = function (grunt) {
                 var truePath = path.join(originBasePath, originPath);
                 var dep = 10;  // 设定最多向上查找10次
 
-                console.log(path.join(currBasePath, originPath));
-                console.log(path.join(originBasePath));
                 // 如果基路径不在应用程序路径中，则附加应用程序路径
                 if (path.join(originBasePath) !== '.\\' && path.join(currBasePath, originPath).indexOf(path.join(originBasePath)) < 0) {
                     originPath = path.join(appBasePath, originPath);
                 }
-                console.log(originPath);
                 while (truePath !== path.join(currBasePath, originPath) && dep !== 0) {
                     originPath = path.join('../', originPath);
                     dep--;
@@ -185,14 +183,22 @@ module.exports = function (grunt) {
         // 解决方案文件路径
         var solutionPath = options.solution === '' ? '' : helper.getRelativePath('./', options.solution, appTargetBasePath);
         var baseInclude = solutionPath === '' ? [] : [solutionPath];
+        var globalMapping = {};
+        // 站点的 path 配置
+        var sitePaths = {};
+
         // 将每个 module 的主文件包含在站点主文件中
         var moduleInclude = _.compact(_.map(options.modules, function (mod) {
             if (mod.name === '.') return false;
-            // return mod.source + '/' + mod.name + '/main';
-            return helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appTargetBasePath);
+            var originPath = mod.source + '/' + mod.name + '/main';
+            var path = helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appBasePath);
+
+           sitePaths[originPath] = path;
+            return originPath;
         }));
-        // 站点的 path 配置
-        var sitePaths = {};
+
+        console.log(sitePaths);
+
         _.each(reqConf.paths, function (path, pathName) {
             if (_.contains(options.notMerge, pathName)) {
                 sitePaths[pathName] = 'empty:';
@@ -200,6 +206,7 @@ module.exports = function (grunt) {
                 sitePaths[pathName] = path;
             }
         });
+
         var defaultSiteOptions = {
             appDir: options.appDir,
             baseUrl: options.baseUrl,
@@ -209,16 +216,21 @@ module.exports = function (grunt) {
                 include: baseInclude.concat(options.merge).concat(moduleInclude)
             }],
             paths: sitePaths,
+            map: globalMapping,
             shim: reqConf.shim || {},
             packages: reqConf.packages || [],
             optimize: options.optimize,
             onBuildRead: function (moduleName, path, contents) {
-                console.log(moduleName);
+                var attachCnt = '';
                 if (moduleName.indexOf('require-conf') > -1) {
                     return contents.replace(/debug\s*\:\s*(true|false)/g, 'debug: false, optimized: true');
                 }
                 if (solutionPath !== '' && moduleName === 'main') {
-                    return 'window.verSolution="' + solutionPath + '";\n' + contents;
+                    attachCnt += 'window.verSolution="' + solutionPath + '";\n';
+                    //if (verModules.length > 0) {
+                    //    attachCnt += 'window.verModules=' + JSON.stringify(verModules) + ';\n';
+                    //}
+                    return attachCnt + contents;
                 }
                 return contents;
             },
