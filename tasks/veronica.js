@@ -23,6 +23,7 @@ module.exports = function (grunt) {
             solution: '',
             merge: [],
             notMerge: [],
+            moduleMerge: [],
             clean: [],
             buildPaths: {},
             cssPack: "all", // all, module, none
@@ -37,7 +38,6 @@ module.exports = function (grunt) {
 
         // 应用程序基路径
         var appBasePath = path.join(options.appDir, options.baseUrl);
-        // 目标应用程序基路径
         var appTargetBasePath = path.join(options.dir, options.baseUrl);
         var helper = {
             // 根据模块生成所有的源配置
@@ -150,28 +150,36 @@ module.exports = function (grunt) {
                 return _.map(sources, function (source, index) {
 
                     var widgetPaths = {};
+                    var emptyPaths = {};
                     var widgetPackages = [];
                     var modules = widgetModules[index];
 
                     // 解析以下几个文件相对于部件文件夹的正确路径 ['text', 'css', 'normalize', 'css-builder']
                     // reqConf.paths
 
+                    _.each(options.notMerge, function (name) {
+                        emptyPaths[name] = 'empty:';
+                    })
+
                     _.each(reqConf.paths, function (path, pathName) {
-                        if (!_.contains(['text', 'css', 'normalize', 'css-builder'], pathName)) return;
-                        widgetPaths[pathName] = _.contains(options.notMerge, pathName) ?
-                            'empty:' : helper.getRelativePath(appBasePath, path, source.origin);
+                        if (_.contains(['text', 'css', 'normalize', 'css-builder'], pathName)
+                            || _.contains(options.moduleMerge, pathName)) {
+                            widgetPaths[pathName] = helper.getRelativePath(appBasePath, path, source.origin);
+                        } else {
+                            emptyPaths[pathName] = 'empty:';
+                        }
                     });
                     _.each(reqConf.packages, function (pkg) {
                         var clonePkg = _.clone(pkg);
-                        clonePkg.location = _.contains(options.notMerge, pkg.name)
-                            ? 'empty:' : helper.getRelativePath(appBasePath, clonePkg.location, source.origin);
-                        widgetPackages.push(clonePkg);
+                        if (!_.contains(options.notMerge, pkg.name)) {
+                            clonePkg.location = helper.getRelativePath(appBasePath, clonePkg.location, source.origin);
+                            widgetPackages.push(clonePkg);
+                        }
                     });
-
                     return {
                         baseUrl: source.origin,
                         dir: source.target,
-                        paths: _.extend({}, widgetRefPaths, widgetPaths, options.buildPaths || {}),
+                        paths: _.extend({}, widgetRefPaths, widgetPaths, emptyPaths, options.buildPaths || {}),
                         modules: modules,
                         packages: widgetPackages
                     };
@@ -183,22 +191,14 @@ module.exports = function (grunt) {
         // 解决方案文件路径
         var solutionPath = options.solution === '' ? '' : helper.getRelativePath('./', options.solution, appTargetBasePath);
         var baseInclude = solutionPath === '' ? [] : [solutionPath];
-        var globalMapping = {};
-        // 站点的 path 配置
-        var sitePaths = {};
-
         // 将每个 module 的主文件包含在站点主文件中
         var moduleInclude = _.compact(_.map(options.modules, function (mod) {
             if (mod.name === '.') return false;
-            var originPath = mod.source + '/' + mod.name + '/main';
-            var path = helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appBasePath);
-
-           sitePaths[originPath] = path;
-            return originPath;
+            // return mod.source + '/' + mod.name + '/main';
+            return helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appTargetBasePath);
         }));
-
-        console.log(sitePaths);
-
+        // 站点的 path 配置
+        var sitePaths = {};
         _.each(reqConf.paths, function (path, pathName) {
             if (_.contains(options.notMerge, pathName)) {
                 sitePaths[pathName] = 'empty:';
@@ -206,7 +206,6 @@ module.exports = function (grunt) {
                 sitePaths[pathName] = path;
             }
         });
-
         var defaultSiteOptions = {
             appDir: options.appDir,
             baseUrl: options.baseUrl,
@@ -216,21 +215,15 @@ module.exports = function (grunt) {
                 include: baseInclude.concat(options.merge).concat(moduleInclude)
             }],
             paths: sitePaths,
-            map: globalMapping,
             shim: reqConf.shim || {},
             packages: reqConf.packages || [],
             optimize: options.optimize,
             onBuildRead: function (moduleName, path, contents) {
-                var attachCnt = '';
                 if (moduleName.indexOf('require-conf') > -1) {
                     return contents.replace(/debug\s*\:\s*(true|false)/g, 'debug: false, optimized: true');
                 }
                 if (solutionPath !== '' && moduleName === 'main') {
-                    attachCnt += 'window.verSolution="' + solutionPath + '";\n';
-                    //if (verModules.length > 0) {
-                    //    attachCnt += 'window.verModules=' + JSON.stringify(verModules) + ';\n';
-                    //}
-                    return attachCnt + contents;
+                    return 'window.verSolution="' + solutionPath + '";\n' + contents;
                 }
                 return contents;
             },
@@ -306,7 +299,6 @@ module.exports = function (grunt) {
             var reqModuleConfigsAndPaths = helper.getReqModulesAndPathsFromSources(sources);
             var sourcesReqConfig = helper.getSourcesReqConfig(sources, reqModuleConfigsAndPaths, options);
 
-            var widgetStyles = [];
 
             // 分别为每个部件源进行打包
             _.each(sources, function (source, i) {
@@ -315,16 +307,11 @@ module.exports = function (grunt) {
 
                 var options = _.extend({}, grunt.config('requirejs.widget.options'), sourcesReqConfig[i]);
 
-                var thisStyles = grunt.file.expand([source.origin + '/**/*.css', '!' + source.origin + '/**/*.min.css']);
-                //var thisStyles = grunt.file.expand(['./test/**/*.css', '!' + './test/**/*.min.css']);
-                widgetStyles.push(thisStyles);
-
                 grunt.config('requirejs.widget' + i, { options: options });
 
                 grunt.config('clean.widget' + i, {
                     src: [
                         source.target + '/**/templates/',
-                        source.target + '/*/**/styles/',
                         source.target + '/**/build.txt',
                         source.target + '/**/css.js',
                         source.target + '/**/css-builder.js',
@@ -349,12 +336,26 @@ module.exports = function (grunt) {
                 // 拷贝部件
                 grunt.task.run('copy:widget' + i);
 
+
+
             });
 
+            grunt.task.run('clean:widgets');
+        });
+
+        grunt.registerTask('css-cmb', function () {
             var allStyleStream = '';
             var cssComboOptions = { files: {} };
             var cssTarget = options.cssTarget;
+            var widgetStyles = [];
             var fs = require('fs');
+
+            _.each(defaultSubPaths, function (p) {
+                var src = path.join(options.dir, options.baseUrl, p);
+
+                var thisStyles = grunt.file.expand([src + '/**/*.css', '!' + src + '/**/*.min.css']);
+                widgetStyles.push(thisStyles);
+            });
 
             _.each(widgetStyles, function (styles, idx) {
                 var stream = '';
@@ -370,6 +371,8 @@ module.exports = function (grunt) {
             });
 
             if (allStyleStream !== '') {
+
+                // 生成 CSS 合并后文件
                 grunt.file.write(options.cssTarget + '/modules.css', allStyleStream);
 
                 if (options.cssPack === 'all') {
@@ -383,18 +386,15 @@ module.exports = function (grunt) {
                 //}
             }
 
-
-
             grunt.config('css_combo.all', cssComboOptions);
-
-            grunt.task.run('clean:widgets');
         });
 
         grunt.registerTask('default', function () {
             grunt.task.run('clean:output');
             grunt.task.run('site');
             grunt.task.run('widgets');
-            //// grunt.task.run('pages');
+            grunt.task.run('css-cmb');
+            // grunt.task.run('pages');
             grunt.task.run('css_combo:all');
             grunt.task.run('clean:main');
             grunt.task.run('clean:others');
@@ -403,8 +403,14 @@ module.exports = function (grunt) {
         });
 
         grunt.registerTask('publish', function () {
-            grunt.task.run('default');
-            grunt.task.run('clean:source');
+            var widgetStyles = [];
+            _.each(defaultSubPaths, function (p) {
+                var src = path.join(options.dir, options.baseUrl, p);
+                console.log(src);
+                var thisStyles = grunt.file.expand([src + '/**/*.css', '!' + src + '/**/*.min.css']);
+                widgetStyles.push(thisStyles);
+            });
+            console.log(widgetStyles);
         });
 
         grunt.task.run('default');
