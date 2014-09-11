@@ -81,7 +81,7 @@ module.exports = function (grunt) {
                 var dep = 10;  // 设定最多向上查找10次
 
                 // 如果基路径不在应用程序路径中，则附加应用程序路径
-                if (path.join(originBasePath) !== '.\\' && path.join(currBasePath, originPath).indexOf(path.join(originBasePath)) < 0) {
+                if (path.join(originBasePath) !== '.\\' && path.join(currBasePath, originPath).indexOf(path.join(originBasePath) + '\\') < 0) {
                     originPath = path.join(appBasePath, originPath);
                 }
                 while (truePath !== path.join(currBasePath, originPath) && dep !== 0) {
@@ -316,7 +316,8 @@ module.exports = function (grunt) {
                         source.target + '/**/css.js',
                         source.target + '/**/css-builder.js',
                         source.target + '/**/normalize.js',
-                        source.target + '/**/text.js'
+                        source.target + '/**/text.js',
+                        source.target + '/**/styles/**'
                     ]
                 });
 
@@ -406,11 +407,9 @@ module.exports = function (grunt) {
             var widgetStyles = [];
             _.each(defaultSubPaths, function (p) {
                 var src = path.join(options.dir, options.baseUrl, p);
-                console.log(src);
                 var thisStyles = grunt.file.expand([src + '/**/*.css', '!' + src + '/**/*.min.css']);
                 widgetStyles.push(thisStyles);
             });
-            console.log(widgetStyles);
         });
 
         grunt.task.run('default');
