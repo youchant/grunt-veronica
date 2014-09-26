@@ -19,7 +19,7 @@ module.exports = function (grunt) {
             entry: 'main',
             reqConfig: '',
             modules: [],
-            optimize: "none", // uglify
+            optimize: { paths: [] }, // uglify
             solution: '',
             merge: [],
             notMerge: [],
@@ -217,7 +217,7 @@ module.exports = function (grunt) {
             paths: sitePaths,
             shim: reqConf.shim || {},
             packages: reqConf.packages || [],
-            optimize: options.optimize,
+            optimize: "none",
             onBuildRead: function (moduleName, path, contents) {
                 if (moduleName.indexOf('require-conf') > -1) {
                     return contents.replace(/debug\s*\:\s*(true|false)/g, 'debug: false, optimized: true');
@@ -234,7 +234,7 @@ module.exports = function (grunt) {
 
         var defaultWidgetOptions = {
             shim: reqConf.shim || {},
-            optimize: options.optimize,
+            optimize: "none",
             // optimizeCss: "none",
             removeCombined: true,
             preserveLicenseComments: false,
@@ -283,6 +283,28 @@ module.exports = function (grunt) {
                         'public/styles/index.css': ['public/styles/index.css']
                     }
                 }
+            },
+            cssmin: {
+                main: {
+                    files: [{
+                        expand: true,
+                        cwd: options.dir,
+                        src: ['**/*.css'].concat(options.optimize.paths),
+                        filter: 'isFile',
+                        dest: options.dir
+                    }]
+                }
+            },
+            uglify: {
+                main: {
+                    files: [{
+                        expand: true,
+                        cwd: options.dir,
+                        src: ['**/*.js'].concat(options.optimize.paths),
+                        filter: 'isFile',
+                        dest: options.dir
+                    }]
+                }
             }
         });
 
@@ -291,6 +313,8 @@ module.exports = function (grunt) {
         grunt.loadNpmTasks('grunt-contrib-copy');
         grunt.loadNpmTasks('grunt-contrib-clean');
         grunt.loadNpmTasks('grunt-css-combo');
+        grunt.loadNpmTasks('grunt-contrib-uglify');
+        grunt.loadNpmTasks('grunt-contrib-cssmin');
 
         grunt.registerTask('site', ['requirejs:site']);
 
@@ -399,7 +423,10 @@ module.exports = function (grunt) {
             grunt.task.run('css_combo:all');
             grunt.task.run('clean:main');
             grunt.task.run('clean:others');
-
+            if (options.optimize) {
+                grunt.task.run('uglify');
+                grunt.task.run('cssmin');
+            }
 
         });
 
