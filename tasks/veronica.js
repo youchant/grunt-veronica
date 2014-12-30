@@ -169,13 +169,14 @@ module.exports = function (grunt) {
                             emptyPaths[pathName] = 'empty:';
                         }
                     });
-                    _.each(reqConf.packages, function (pkg) {
+                    _.each(reqConf.packages, function (pkg, i) {
                         var clonePkg = _.clone(pkg);
                         if (!_.contains(options.notMerge, pkg.name)) {
                             clonePkg.location = helper.getRelativePath(appBasePath, clonePkg.location, source.origin);
                             widgetPackages.push(clonePkg);
                         }
                     });
+
                     return {
                         baseUrl: source.origin,
                         dir: source.target,
@@ -191,11 +192,21 @@ module.exports = function (grunt) {
         // 解决方案文件路径
         var solutionPath = options.solution === '' ? '' : helper.getRelativePath('./', options.solution, appTargetBasePath);
         var baseInclude = solutionPath === '' ? [] : [solutionPath];
+        var allModules = _.map(options.modules, function (mod) {
+            if (_.isString(mod)) {
+                mod = {
+                    name: mod,
+                    source: './modules'
+                };
+            }
+            return mod;
+        });
         // 将每个 module 的主文件包含在站点主文件中
-        var moduleInclude = _.compact(_.map(options.modules, function (mod) {
+        var moduleInclude = _.compact(_.map(allModules, function (mod) {
             if (mod.name === '.') return false;
-            // return mod.source + '/' + mod.name + '/main';
-            return helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appTargetBasePath);
+            return mod.source + '/' + mod.name + '/main';
+            //  console.log(mod.source + '/' + mod.name + '/main');
+            //   return helper.getRelativePath(appBasePath, mod.source + '/' + mod.name + '/main', appTargetBasePath);
         }));
         // 站点的 path 配置
         var sitePaths = {};
@@ -206,6 +217,14 @@ module.exports = function (grunt) {
                 sitePaths[pathName] = path;
             }
         });
+        _.each(reqConf.packages, function (pkg, i) {
+            if (_.contains(options.notMerge, pkg.name)) {
+                reqConf.packages[i] = false;
+                sitePaths[pkg.name] = 'empty:';
+            }
+        });
+        reqConf.packages = _.compact(reqConf.packages);
+
         var defaultSiteOptions = {
             appDir: options.appDir,
             baseUrl: options.baseUrl,
@@ -271,7 +290,8 @@ module.exports = function (grunt) {
                 // TODO: 这里写死了一些路径，需考虑一种更优雅的方式
                 main: [
                    options.dir + '/**/*.less',
-                   options.dir + '/**/build.txt'
+                   options.dir + '/**/build.txt',
+                   options.dir + '/**/widgets/**/styles'
                 ],
                 output: [options.dir],
                 others: options.clean,
@@ -319,7 +339,7 @@ module.exports = function (grunt) {
         grunt.registerTask('site', ['requirejs:site']);
 
         grunt.registerTask('widgets', function () {
-            var sources = helper.getSourcesFromModules(options.modules, reqConf);
+            var sources = helper.getSourcesFromModules(allModules, reqConf);
             var reqModuleConfigsAndPaths = helper.getReqModulesAndPathsFromSources(sources);
             var sourcesReqConfig = helper.getSourcesReqConfig(sources, reqModuleConfigsAndPaths, options);
 
@@ -341,7 +361,7 @@ module.exports = function (grunt) {
                         source.target + '/**/css-builder.js',
                         source.target + '/**/normalize.js',
                         source.target + '/**/text.js',
-                        source.target + '/**/styles/**'
+                        source.target + '/**/main.css'
                     ]
                 });
 
