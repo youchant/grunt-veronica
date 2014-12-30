@@ -3,3 +3,4 @@ bower_components
 test/target
 npm-debug.log
 tmp
+vwd.webinfo
