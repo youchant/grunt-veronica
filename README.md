@@ -60,42 +60,18 @@ grunt.initConfig({
 
 打包后的应用程序根路径
 
+```js
+appDir: './app',
+baseUrl: './',
+dir: './app-release',
+```
+
 #### reqConfig
 
 类型：`Object` 默认值：`''`
 
-用于 RequireJS 的配置项，包括：
+用于 RequireJS 的配置项，包括：`paths`、`shim`、`packages`
 
-* paths: 第三方库的路径
-* shim: 
-* packages: 第三方库的包路径
-
-#### modules
-
-类型：`Array` 默认值：`[]`
-
-应用中的模块，最终模块的路径会由 source + name 组合而成，默认会查找该模块路径下的 `widgets` 和 `plugins` 文件夹，也就是说默认情况下，你应该将部件和插件放到这个位置，如果你放到其他文件夹下，就应该配置 subpaths，例如： 
-
-```
-[{
-   name: 'base',  // 模块名称
-   source: './modules'  // 模块放置的路径（该路径相对于应用的基路径）,
-   subpaths: ['widgets/widgets1']  // 如果在默认路径下划分了子路径放置部件或插件，在这里配置
-}]
-```
-
-它的模块目录为： ./modules/base，部件放置在 ./modules/base/widgets/widgets1 中，这个配置反映了一个事实：部件放置在某个已知路径的子文件夹中，也不会被识别，例如配置了部件放置在 ./modules/base/widgets 中，如果你放到 ./modules/base/widgets/widgets1 中则不会被识别，你应该为这个路径配置另外一个 `subpaths`
-
-> **注意**
->
-> 如果项目没有 module，那么打包时配置 name 为 '.'，并为每个部件源配置 subpaths
-> ```js
-> modules: [{
-    name: '.',
-    source: '.',
-    subpaths: ['./widgets/base']
-> }]
-> ```
 
 #### optimize
 
@@ -110,72 +86,135 @@ grunt.initConfig({
 }
 ```
 
-#### solution
-
-类型：`String` 默认值：`''`
-
-解决方案路径，没有单独的解决方案文件可不填
-
-#### merge
-
-类型：`Array` 默认值：`[]`
-
-要合并进主文件的路径
-
-示例：
-
-```
-merge: ['veronica-mvc', 'app']
-```
-
 #### notMerge
 
 类型：`Array` 默认值：`[]`
 
-从文件打包中排除的路径，不合并到任意文件中
+从文件打包中排除的路径，不合并到**任意文件**中
 
-#### moduleMerge
-
-类型：`Array` 默认值：`[]`
-
-打包 module 中的 widget 或 plugin 时，要合并的第三方库。
-
-默认不会合并出现在module中的任何第三方库，这里的配置可让某些只在一个地方出现的第三方库合并到widget或plugin的主文件中
+```js
+notMerge: ['jquery'],
+```
 
 #### clean
 
 类型：`Array` 默认值：`[]`
 
-合并后清理的文件（夹）
+合并后清理的文件（夹），配置的路径相对于当前 Grunt 的执行路径
 
-#### buildPaths
+```js
+clean: [
+  './app-release/widgets/**/*.css',
+  './app-release/widgets/**/*.html',
+  './app-release/modules',
+  './app-release/**/require-conf.js'
+],
+```
+
+#### moduleMerge
+
+类型：`Array` 默认值：`[]`
+
+打包 module 中的 package 时，要合并的第三方库。
+
+默认不会合并出现在module中的任何第三方库，这里的配置可让某些只在一个地方出现的第三方库合并到jsPack的Package主文件中
+
+#### entryPack
+
+类型：`Array` 默认值：`[]`
+
+对入口文件进行打包，这里的配置是标准 RequireJS 的 `modules` 配置
+
+示例：
+
+```js
+entryPack: [{
+    name: './main',
+    include: ['./require-conf', 'veronica', 'jquery', 'underscore',
+        'text', 'css', './modules/dashboard/main', './modules/user-control/main']
+}]
+```
+
+#### jsPack
 
 类型：`Object` 默认值：`{}`
 
-打包时采用的不同的路径
+配置package的路径，进行package打包
+
+
+**jsPack.defaults**
+
+每个配置项的默认参数设置，可以更改此配置
+
+默认的参数：
+
+```js
+{
+	name: '',
+    origin: function(){
+    	return './modules/' + this.name;
+    },
+    target: './widgets',
+    unique: false
+}
+```
+
+**jsPack.paths**
+
+类型：`Array` 默认值：`[]`
+
+要打包的路径配置，每个数组项包括以下几个配置：
+
+* name: **必填项** 路径的名称，这个通常与项目中的 module 名称相同
+* origin：`Function or String` 要查找package的路径，相对于 baseUrl
+* target：所有package打包后放置的路径，相对于 dir 和 baseUrl
+* unique：是否将所有package文件夹名称更改为唯一命名（适用于多层级放置的package）
+
+配置项也支持String的方式设置，这样它设置的是配置项中的`name`属性
+
+```js
+jsPack: {
+    defaults: {
+        target: './widgets2'
+    },
+    paths: [{
+        name: 'dashboard'
+    }, 'user-control', {
+        name: 'others',
+        origin: './modules/others',
+        target: './widgets',
+        unique: true
+    }]
+},
+```
 
 #### cssPack
 
-类型：`String` 默认值：`'all'`
+类型：`Object` 默认值：`'{}'`
 
-css打包的策略，现在暂只支持将所有 modules 的 css 文件合并到一个文件中
+css打包的策略，现在暂只支持将所有 Package 的 CSS 文件合并到一个文件中
 
-> **注意**
+> **为什么要合并**
 >
-> 由于 IE6 - IE9 CSS样式的限制，因此在打包应考虑到在样式文件个数和样式选择器个数之间找到平衡关系。
-参考：http://stackoverflow.com/questions/9906794/internet-explorers-css-rules-limits
+> 由于[IE6 - IE9 CSS样式的限制](http://stackoverflow.com/questions/9906794/internet-explorers-css-rules-limits)，如果CSS分散在不同的Package中，会触发这个限制，因此在打包应考虑到在样式文件个数和样式选择器个数之间找到平衡关系。
 
-#### cssTarget
+配置项：
 
-类型：`String` 默认值：`'**/styles'`
+* mode: 合并模式，当前只支持 `all`
+* name: 最终合并后的CSS文件名
+* src：查找待合并CSS的路径
+* target：合并后文件的放置路径
 
-打包css文件后的目标路径，该路径相对于当前打包的工作路径，默认是打包后应用路径下的 'styles' 文件夹
+示例：
 
-**removeCombined**
-
-类型：`Boolean` 默认值：`true`
-
-是否移除合并后的公共库，默认是 true，如果公共库会被其他应用所引用，则应设为 false
+```js
+cssPack: {
+    mode: 'all',
+    name: 'module.css',
+    src: ['./widgets'],
+    target: './app-release/styles'
+}
+```
 
 ### 示例
 
@@ -208,14 +247,14 @@ options: {
     baseUrl: '.',
     dir: './release',
     reqConfig: require('./app/require-conf.js')(),
-    modules: [{
-        name: '.',
-        source: '.',
-        subpaths: [
-            './widgets/base',
-            './widgets/music',
-            './widgets/account'
-        ]
+    entryPack: [{
+    	name: './main',
+        include: ['./require-conf']
+    }],
+    jsPack: [{
+    	name: '',
+        origin: './widgets',
+        unique: true
     }]
 }
 ```
@@ -240,8 +279,6 @@ options: {
    |       ├── widgets/
    |       ├── plugins/
    |       └── main.js 
-   ├── solutions
-   |   └── build.js
    |── project-main
    |  ├── modules-core
    |  |   └── base
@@ -257,7 +294,6 @@ options: {
 
 * 打包配置
 
-solutions/build.js
 
 ```js
 ……
@@ -280,12 +316,32 @@ Gruntfile.js
 
 ```
 options: {
-    appDir: './project/project-large/proj-main',
+    appDir: './proj-main',
     baseUrl: '.',
     dir: './release',
     reqConfig: require('./project-main/modules-core/require-conf.js')(),
-    solution: './solutions/build.js',
-    modules: require('./solutions/build.js').modules
+    entryPack: [{
+    	name: './main'
+    }],
+    jsPack: [{
+    	name: 'base',
+        origin: './modules-core/base/widgets'
+    },{
+    	name: 'music',
+        origin: '../modules-A/music/widgets'
+    },{
+    	name: 'music',
+        origin: './modules-A/music/plugins'
+    },{
+    	name: 'account',
+        origin: './modules-B/account/widgets'
+    }],
+    cssPack: {
+        mode: 'all',
+        name: 'module.css',
+        src: ['./widgets'],
+        target: './release/styles'
+    }
 }
 ```
 
