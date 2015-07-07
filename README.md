@@ -196,7 +196,7 @@ css打包的策略，现在暂只支持将所有 Package 的 CSS 文件合并到
 
 > **为什么要合并**
 >
-> 由于[IE6 - IE9 CSS样式的限制](http://stackoverflow.com/questions/9906794/internet-explorers-css-rules-limits)，如果CSS分散在不同的Package中，会触发这个限制，因此在打包应考虑到在样式文件个数和样式选择器个数之间找到平衡关系。
+> 由于[IE6 - IE9 CSS样式的限制](http://stackoverflow.com/questions/9906794/internet-explorers-css-rules-limits)，如果CSS分散在不同的Package中，可能会触发这个限制，因此在打包应考虑到在样式文件个数和样式选择器个数之间找到平衡关系。
 
 配置项：
 
@@ -240,6 +240,8 @@ cssPack: {
 ```
 
 * 打包配置
+
+Gruntfile.js
 
 ```
 options: {
@@ -289,28 +291,9 @@ options: {
    |  └── require-conf.js
    ├── release
    └── Gruntfile.js
-        
 ```
 
 * 打包配置
-
-
-```js
-……
-return {
-    // 模块
-    modules: [{
-           name: 'music',
-           source: '../modules-A'
-       } , {
-           name: 'account',
-           source: './modules-B'
-       }, {
-        name: 'group',
-        source: '../modules-B'
-    }]
-……
-```
 
 Gruntfile.js
 
