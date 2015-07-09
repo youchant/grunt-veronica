@@ -9,6 +9,11 @@
 'use strict';
 
 module.exports = function (grunt) {
+    var _ = require('underscore');
+    var path = require('path');
+    var entryPack = require('../lib/entryPack.js');
+    var jsPack = require('../lib/jspack');
+    var cssPack = require('../lib/csspack');
 
     grunt.registerMultiTask('veronica', 'build veronica project', function () {
 
@@ -23,31 +28,34 @@ module.exports = function (grunt) {
             moduleMerge: [],
             clean: [],
             removeCombined: false,  // @deprecated
-            jsPack: {
-                common: {
-                    target: './widgets'
-                },
-                paths: [{
-                    origin: './widgets'
-                }]
-            },
-            cssPack: {
-                mode: "all", // all, module, none
-                src: [],
-                target: this.data.options.dir + '/styles'
+            jsPack: {},
+            cssPack: {},
+            remote: {
+                vendor: [],
+                modules: [],
+                copy: {}
             }
         };
 
         var options = this.options(defaults);
-        var _ = require('underscore');
-        var path = require('path');
-        var reqConf = options.reqConfig;
-        var defaultSubPaths = ['widgets', 'plugins'];
-
+        var globalOptions = options;
         var helper = require('../lib/helper.js')(options);
-        var entryPack = require('../lib/entryPack.js');
+        var reqConf = options.reqConfig;
 
 
+        // 系统默认值
+        var remoteLocalName = '__local__';
+        var pkgSysDefaults = {
+            pkgParent: './modules/',
+            pkgTarget: './widgets'
+        };
+
+        var cssPackSysDefaults = {
+            mode: 'all',
+            name: 'module.css',
+            src: ['./widgets'],
+            target: options.dir + '/styles'
+        };
 
         grunt.initConfig({
             // 任务配置
@@ -63,21 +71,31 @@ module.exports = function (grunt) {
                     separator: '\n'
                 }
             },
-            copy: { main: {} },
+            copy: {
+                main: {},
+                remote: options.remote.copy
+            },
             clean: {
                 // TODO: 这里写死了一些路径，需考虑一种更优雅的方式
                 main: [
                    options.dir + '/**/*.less',
                    options.dir + '/**/build.txt',
                    options.dir + '/**/__temp__',
-                   options.dir + '/**/__tempRelease__'
+                   options.dir + '/**/__tempRelease__',
+                   options.dir + '/widgets/**/*.css',
+                   options.dir + '/widgets/**/*.html',
+                   options.dir + '/modules',
+                   options.dir + '/**/require-conf.js'
                 ],
                 output: [options.dir],
-                others: options.clean
+                others: options.clean,
+                remote: [
+                    remoteLocalName
+                ]
             },
             css_combo: {
                 main: {
-                    files: options.cssPack.combo || { }
+                    files: options.cssPack.combo || {}
                 }
             },
             cssmin: {
@@ -111,13 +129,13 @@ module.exports = function (grunt) {
         grunt.loadNpmTasks('grunt-css-combo');
         grunt.loadNpmTasks('grunt-contrib-uglify');
         grunt.loadNpmTasks('grunt-contrib-cssmin');
+        grunt.loadNpmTasks('grunt-curl');
+        grunt.loadNpmTasks('grunt-zip');
 
         grunt.registerTask('site', ['requirejs:site']);
 
-        var jsPack = require('../lib/jspack');
-
-        grunt.registerTask('widgets', function () {
-            var mbConfig = jsPack.getPaths(options.jsPack, options);
+        grunt.registerTask('jsPack', function () {
+            var mbConfig = jsPack.getPaths(options.jsPack, options, pkgSysDefaults);
 
             grunt.registerTask('copyWidgets', function () {
                 var wrench = require('wrench');
@@ -227,70 +245,64 @@ module.exports = function (grunt) {
 
         grunt.registerTask('cssPack', function () {
             grunt.registerTask('css-combine', function () {
-                var allStyleStream = '';
                 var cssComboOptions = { files: {} };
-                var cssTarget = options.cssPack.target;
-                var cssName = '/' + options.cssPack.name;
-                var allStyles = [];
-                var fs = require('fs');
-
-                _.each(options.cssPack.src, function (p) {
-                    var src = path.join(options.dir, options.baseUrl, p);  // 相对于基路径
-
-                    var thisStyles = grunt.file.expand([src + '/**/*.css', '!' + src + '/**/*.min.css']);
-                    allStyles.push(thisStyles);
-                });
-
-                _.each(allStyles, function (styles, idx) {
-                    var stream = '';
-
-                    _.each(styles, function (style) {
-                        stream += '@import "' + helper.getRelativePath('./', style, cssTarget) + '";\n';
-                    });
-
-                    if (options.cssPack.mode === "all") {
-                        allStyleStream += stream;
-                    }
-                });
-
-                if (allStyleStream !== '') {
-                    // fs.writeFileSync(cssTarget + cssName, allStyleStream);
-                    // 生成 CSS 合并后文件
-                    grunt.file.write(cssTarget + cssName, allStyleStream);
-
-                    if (options.cssPack.mode === 'all') {
-                        cssComboOptions.files[cssTarget + cssName] = [cssTarget + cssName];
-                    }
-                }
+                var fileName = cssPack.createFile(options, cssPackSysDefaults);
+                cssComboOptions.files[fileName] = [fileName];
 
                 grunt.config('css_combo.all', cssComboOptions);
+
             });
 
             grunt.task.run(['css-combine', 'css_combo']);
         });
 
+        grunt.registerTask('fetch', function () {
+            var i = 0;
 
-        grunt.registerTask('default', function () {
-            grunt.task.run('clean:output');
-            grunt.task.run('site');
-            grunt.task.run('widgets');
-            grunt.task.run('cssPack');
-            grunt.task.run('clean:main');
-            grunt.task.run('clean:others');
-            if (options.optimize) {
-                grunt.task.run('uglify');
-                grunt.task.run('cssmin');
-            }
+            globalOptions.remote.vendor.forEach(function (v) {
+                var zipName = remoteLocalName + '/' + v.name;
+                grunt.config.set('curl.' + i, {
+                    src: v.path + v.name,
+                    dest: zipName
+                });
+                grunt.config.set('unzip.' + i, {
+                    src: zipName,
+                    dest: remoteLocalName
+                });
 
+                i++;
+            });
+            globalOptions.remote.modules.forEach(function (v) {
+                var zipName = remoteLocalName + '/' + v.name;
+                grunt.config.set('curl.' + i, {
+                    src: v.path + v.name,
+                    dest: zipName
+                });
+                grunt.config.set('unzip.' + i, {
+                    src: zipName,
+                    dest: remoteLocalName + '/modules'
+                });
+                i++;
+            });
+
+            grunt.task.run(['clean:remote', 'curl', 'unzip']);
         });
 
-        grunt.registerTask('publish', function () {
-            var widgetStyles = [];
-            _.each(defaultSubPaths, function (p) {
-                var src = path.join(options.dir, options.baseUrl, p);
-                var thisStyles = grunt.file.expand([src + '/**/*.css', '!' + src + '/**/*.min.css']);
-                widgetStyles.push(thisStyles);
-            });
+        grunt.registerTask('default', function () {
+            grunt.task.run([
+                'clean:output',
+                'fetch',
+                'site',
+                'jsPack',
+                'cssPack',
+                'copy:remote',
+                'clean:main',
+                'clean:others',
+                'clean:remote'
+            ]);
+            if (options.optimize) {
+                grunt.task.run(['uglify', 'cssmin']);
+            }
         });
 
         grunt.task.run('default');
