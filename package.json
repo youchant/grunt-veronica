@@ -27,7 +27,8 @@
     "test": "grunt test"
   },
   "dependencies": {
-    "underscore": "latest"
+    "underscore": "latest",
+    "wrench": "^1.5.8"
   },
   "peerDependencies": {
     "grunt": "~0.4.5",
