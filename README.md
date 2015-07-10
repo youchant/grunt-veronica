@@ -36,7 +36,7 @@ grunt.initConfig({
     your_target: {
       // Target-specific file lists and/or options go here.
     },
-  },
+  }
 });
 ```
 
@@ -200,10 +200,10 @@ css打包的策略，现在暂只支持将所有 Package 的 CSS 文件合并到
 
 配置项：
 
-* mode: 合并模式，当前只支持 `all`
-* name: 最终合并后的CSS文件名
-* src：查找待合并CSS的路径
-* target：合并后文件的放置路径
+* mode: 合并模式，默认值：`'all'`
+* name: 最终合并后的CSS文件名，默认值：`'module.css'`
+* src：查找待合并CSS的路径，默认值：`['./widgets']`
+* target：合并后文件的放置路径，默认值：`options.dir + '/styles'`
 
 示例：
 
@@ -215,6 +215,40 @@ cssPack: {
     target: './app-release/styles'
 }
 ```
+
+#### remote
+
+远程目录打包
+
+**remote.vendor**
+
+类型：`Array` 默认值：`[]`
+
+项目使用的远程第三方库压缩包配置，在打包时会下载这个压缩包并解压到本地文件夹 `__local__`
+
+```js
+vendor: [{
+    path: 'http://xxx.xx/',
+    name: 'bower_components.zip'
+}]
+```
+
+**remote.modules**
+
+类型：`Array` 默认值：`[]`
+
+项目使用的远程 Package 配置，在打包时会下载这个压缩包并解压到本地文件夹 `__local__/modules`
+
+```js
+modules: [{
+    name: 'basic.zip',
+    path: 'http://xxxxx/'
+}]
+```
+
+**remote.copy**
+
+在项目打包结束后，需要进行拷贝的文件（夹），这里使用 `grunt.contrib.copy` 的配置
 
 ### 示例
 
@@ -329,4 +363,5 @@ options: {
 ```
 
 ## Release History
+
 _(Nothing yet)_
