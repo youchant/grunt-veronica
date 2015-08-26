@@ -30,11 +30,7 @@ module.exports = function (grunt) {
             removeCombined: false,  // @deprecated
             jsPack: {},
             cssPack: {},
-            remote: {
-                vendor: [],
-                modules: [],
-                copy: {}
-            }
+            remote: {}
         };
 
         var options = this.options(defaults);
@@ -129,8 +125,11 @@ module.exports = function (grunt) {
         grunt.loadNpmTasks('grunt-css-combo');
         grunt.loadNpmTasks('grunt-contrib-uglify');
         grunt.loadNpmTasks('grunt-contrib-cssmin');
+        grunt.loadNpmTasks('grunt-contrib-less');
         grunt.loadNpmTasks('grunt-curl');
         grunt.loadNpmTasks('grunt-zip');
+
+        grunt.registerTask('less', ['less']);
 
         grunt.registerTask('site', ['requirejs:site']);
 
@@ -247,8 +246,9 @@ module.exports = function (grunt) {
             grunt.registerTask('css-combine', function () {
                 var cssComboOptions = { files: {} };
                 var fileName = cssPack.createFile(options, cssPackSysDefaults);
-                cssComboOptions.files[fileName] = [fileName];
-
+                if (fileName !== '') { // 修复空文件的bug
+                    cssComboOptions.files[fileName] = [fileName];
+                }
                 grunt.config('css_combo.all', cssComboOptions);
 
             });
@@ -259,7 +259,13 @@ module.exports = function (grunt) {
         grunt.registerTask('fetch', function () {
             var i = 0;
 
-            globalOptions.remote.vendor.forEach(function (v) {
+            var remoteConfig = _.extend({
+                vendor: [],
+                modules: [],
+                copy: {}
+            }, globalOptions.remote);
+
+            remoteConfig.vendor.forEach(function (v) {
                 var zipName = remoteLocalName + '/' + v.name;
                 grunt.config.set('curl.' + i, {
                     src: v.path + v.name,
@@ -272,7 +278,7 @@ module.exports = function (grunt) {
 
                 i++;
             });
-            globalOptions.remote.modules.forEach(function (v) {
+            remoteConfig.modules.forEach(function (v) {
                 var zipName = remoteLocalName + '/' + v.name;
                 grunt.config.set('curl.' + i, {
                     src: v.path + v.name,
