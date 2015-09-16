@@ -125,11 +125,8 @@ module.exports = function (grunt) {
         grunt.loadNpmTasks('grunt-css-combo');
         grunt.loadNpmTasks('grunt-contrib-uglify');
         grunt.loadNpmTasks('grunt-contrib-cssmin');
-        grunt.loadNpmTasks('grunt-contrib-less');
         grunt.loadNpmTasks('grunt-curl');
         grunt.loadNpmTasks('grunt-zip');
-
-        grunt.registerTask('less', ['less']);
 
         grunt.registerTask('site', ['requirejs:site']);
 
