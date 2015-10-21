@@ -77,6 +77,7 @@ module.exports = function (grunt) {
                    options.dir + '/**/*.less',
                    options.dir + '/**/build.txt',
                    options.dir + '/**/__temp__',
+                   options.dir + '/**/__tempUnique__',
                    options.dir + '/**/__tempRelease__',
                    options.dir + '/widgets/**/*.css',
                    options.dir + '/widgets/**/*.html',

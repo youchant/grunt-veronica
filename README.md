@@ -364,4 +364,3 @@ options: {
 
 ## Release History
 
-_(Nothing yet)_
