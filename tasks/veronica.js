@@ -26,7 +26,7 @@ module.exports = function (grunt) {
             optimize: { paths: [] }, // uglify
             notMerge: [],
             moduleMerge: [],
-            clean: [],
+            clean: {},
             removeCombined: false,  // @deprecated
             jsPack: {},
             cssPack: {},
@@ -35,9 +35,6 @@ module.exports = function (grunt) {
 
         var options = this.options(defaults);
         var globalOptions = options;
-        var helper = require('../lib/helper.js')(options);
-        var reqConf = options.reqConfig;
-
 
         // 系统默认值
         var remoteLocalName = '__local__';
@@ -51,6 +48,25 @@ module.exports = function (grunt) {
             name: 'module.css',
             src: ['./widgets'],
             target: options.dir + '/styles'
+        };
+        var cleanDefaults = {
+            // TODO: 这里写死了一些路径，需考虑一种更优雅的方式
+            afterEntryPack: [
+                options.dir + '/**/*.less', 
+                options.dir + '/**/require-conf.js'
+            ],
+            afterJsPack: [
+                options.dir + '/**/build.txt',
+                options.dir + '/**/__temp__',
+                options.dir + '/**/__tempUnique__',
+                options.dir + '/**/__tempRelease__',
+                options.dir + '/widgets/**/*.css',
+                options.dir + '/widgets/**/*.html',
+                options.dir + '/modules',
+            ],
+            output: [options.dir],
+            custom: [],
+            remote: [remoteLocalName]
         };
 
         grunt.initConfig({
@@ -71,25 +87,7 @@ module.exports = function (grunt) {
                 main: {},
                 remote: options.remote.copy
             },
-            clean: {
-                // TODO: 这里写死了一些路径，需考虑一种更优雅的方式
-                main: [
-                   options.dir + '/**/*.less',
-                   options.dir + '/**/build.txt',
-                   options.dir + '/**/__temp__',
-                   options.dir + '/**/__tempUnique__',
-                   options.dir + '/**/__tempRelease__',
-                   options.dir + '/widgets/**/*.css',
-                   options.dir + '/widgets/**/*.html',
-                   options.dir + '/modules',
-                   options.dir + '/**/require-conf.js'
-                ],
-                output: [options.dir],
-                others: options.clean,
-                remote: [
-                    remoteLocalName
-                ]
-            },
+            clean: _.extend(cleanDefaults, options.clean),
             css_combo: {
                 main: {
                     files: options.cssPack.combo || {}
@@ -191,8 +189,6 @@ module.exports = function (grunt) {
                         options: reqOptions
                     });
 
-
-
                     grunt.config('clean.widget' + i, {
                         src: _.map([
                             '/**/templates/',
@@ -243,10 +239,14 @@ module.exports = function (grunt) {
         grunt.registerTask('cssPack', function () {
             grunt.registerTask('css-combine', function () {
                 var cssComboOptions = { files: {} };
-                var fileName = cssPack.createFile(options, cssPackSysDefaults);
-                if (fileName !== '') { // 修复空文件的bug
-                    cssComboOptions.files[fileName] = [fileName];
-                }
+                var fileNames = cssPack.createFiles(options, cssPackSysDefaults);
+
+                _.each(fileNames, function (fileName) {
+                    if (fileName !== '') { // 修复空文件的bug
+                        cssComboOptions.files[fileName] = [fileName];
+                    }
+                });
+
                 grunt.config('css_combo.all', cssComboOptions);
 
             });
@@ -293,17 +293,39 @@ module.exports = function (grunt) {
         });
 
         grunt.registerTask('default', function () {
-            grunt.task.run([
+            var tasks = [
                 'clean:output',
                 'fetch',
                 'site',
                 'jsPack',
                 'cssPack',
                 'copy:remote',
-                'clean:main',
-                'clean:others',
+                'clean:afterEntryPack',
+                'clean:afterJsPack',
+                'clean:custom',
                 'clean:remote'
-            ]);
+            ];
+            if (options.clean.output === false) {
+                tasks[0] = false;
+            }
+            if (options.remote === false) {
+                tasks[1] = false;
+                tasks[5] = false;
+                tasks[9] = false;
+            }
+            if (options.entryPack === false) {
+                tasks[2] = false;
+                tasks[6] = false;
+            }
+            if (options.jsPack === false) {
+                tasks[3] = false;
+                tasks[7] = false;
+            }
+            if (options.cssPack === false) {
+                tasks[4] = false;
+            }
+
+            grunt.task.run(_.compact(tasks));
             if (options.optimize) {
                 grunt.task.run(['uglify', 'cssmin']);
             }
