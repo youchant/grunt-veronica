@@ -190,9 +190,9 @@ jsPack: {
 
 #### cssPack
 
-类型：`Object` 默认值：`'{}'`
+类型：`Object` 默认值：`'[]'`
 
-css打包的策略，现在暂只支持将所有 Package 的 CSS 文件合并到一个文件中
+css 打包的策略，指定不同的文件夹合并其内的所有 CSS 文件
 
 > **为什么要合并**
 >
@@ -200,7 +200,7 @@ css打包的策略，现在暂只支持将所有 Package 的 CSS 文件合并到
 
 配置项：
 
-* mode: 合并模式，默认值：`'all'`
+* mode: 合并模式，默认值：`'all'` *未启用*
 * name: 最终合并后的CSS文件名，默认值：`'module.css'`
 * src：查找待合并CSS的路径，默认值：`['./widgets']`
 * target：合并后文件的放置路径，默认值：`options.dir + '/styles'`
@@ -218,7 +218,7 @@ cssPack: {
 
 #### remote
 
-远程目录打包
+远程目录打包，如果不启用该特性，传入 `false`
 
 **remote.vendor**
 
