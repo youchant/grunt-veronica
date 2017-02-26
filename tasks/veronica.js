@@ -1,10 +1,10 @@
 /*
-* grunt-veronica
-* https://github.com/gochant/grunt-veronica
-*
-* Copyright (c) 2014 channing
-* Licensed under the MIT license.
-*/
+ * grunt-veronica
+ * https://github.com/gochant/grunt-veronica
+ *
+ * Copyright (c) 2014 channing
+ * Licensed under the MIT license.
+ */
 
 'use strict';
 
@@ -23,14 +23,16 @@ module.exports = function (grunt) {
             dir: '',  // 打包后的应用程序根路径
             reqConfig: '',
             entryPack: [],
-            optimize: { paths: [] }, // uglify
+            optimize: {paths: []}, // uglify
             notMerge: [],
             moduleMerge: [],
+            copy: {},
             clean: {},
             removeCombined: false,  // @deprecated
             jsPack: {},
             cssPack: {},
-            remote: {}
+            remote: false,
+            writeBuildTxt: false
         };
 
         var options = this.options(defaults);
@@ -52,22 +54,25 @@ module.exports = function (grunt) {
         var cleanDefaults = {
             // TODO: 这里写死了一些路径，需考虑一种更优雅的方式
             afterEntryPack: [
-                options.dir + '/**/*.less', 
-                options.dir + '/**/require-conf.js'
+                options.dir + '/**/*.less'
             ],
             afterJsPack: [
-                options.dir + '/**/build.txt',
                 options.dir + '/**/__temp__',
                 options.dir + '/**/__tempUnique__',
                 options.dir + '/**/__tempRelease__',
-                options.dir + '/widgets/**/*.css',
-                options.dir + '/widgets/**/*.html',
-                options.dir + '/modules',
+                '__tempWWW__',
             ],
             output: [options.dir],
             custom: [],
             remote: [remoteLocalName]
         };
+
+        // 预处理选项
+        var createAppDir = false;  // 是否构建 app 目录
+        if (typeof options.appDir === 'object') {
+            createAppDir = options.appDir.origin;
+            options.appDir = options.appDir.target || '__tempWWW__';
+        }
 
         grunt.initConfig({
             // 任务配置
@@ -84,9 +89,10 @@ module.exports = function (grunt) {
                 }
             },
             copy: {
-                main: {},
+                main: options.copy,
                 remote: options.remote.copy
             },
+
             clean: _.extend(cleanDefaults, options.clean),
             css_combo: {
                 main: {
@@ -109,7 +115,7 @@ module.exports = function (grunt) {
                     files: [{
                         expand: true,
                         cwd: options.dir,
-                        src: ['**/*.js'].concat(options.optimize.paths || []),
+                        src: ['**/*.js', '!**/*.min.js'].concat(options.optimize.paths || []),
                         filter: 'isFile',
                         dest: options.dir
                     }]
@@ -127,7 +133,21 @@ module.exports = function (grunt) {
         grunt.loadNpmTasks('grunt-curl');
         grunt.loadNpmTasks('grunt-zip');
 
-        grunt.registerTask('site', ['requirejs:site']);
+        grunt.registerTask('site', function () {
+            var dirs = [];
+            if (createAppDir) {
+               dirs = createAppDir.map(function (cwd, i) {
+                   return Object.assign({
+                       expand: true,
+                       dest: options.appDir
+                   }, cwd);
+                });
+            }
+            grunt.config('copy.site', {
+                files: dirs
+            })
+            grunt.task.run(['copy:site', 'requirejs:site']);
+        });
 
         grunt.registerTask('jsPack', function () {
             var mbConfig = jsPack.getPaths(options.jsPack, options, pkgSysDefaults);
@@ -154,7 +174,7 @@ module.exports = function (grunt) {
                                 var copyToFolder = path.resolve(path.join(config.temp_unique, uniqueFolder));
 
                                 wrench.mkdirSyncRecursive(copyToFolder);
-                                wrench.copyDirSyncRecursive(originFolder, copyToFolder, { forceDelete: true });
+                                wrench.copyDirSyncRecursive(originFolder, copyToFolder, {forceDelete: true});
 
                                 deleteFolder.push(originFolder);
 
@@ -238,7 +258,7 @@ module.exports = function (grunt) {
 
         grunt.registerTask('cssPack', function () {
             grunt.registerTask('css-combine', function () {
-                var cssComboOptions = { files: {} };
+                var cssComboOptions = {files: {}};
                 var fileNames = cssPack.createFiles(options, cssPackSysDefaults);
 
                 _.each(fileNames, function (fileName) {
@@ -300,6 +320,7 @@ module.exports = function (grunt) {
                 'jsPack',
                 'cssPack',
                 'copy:remote',
+                'copy:main',
                 'clean:afterEntryPack',
                 'clean:afterJsPack',
                 'clean:custom',
@@ -311,15 +332,15 @@ module.exports = function (grunt) {
             if (options.remote === false) {
                 tasks[1] = false;
                 tasks[5] = false;
-                tasks[9] = false;
+                tasks[10] = false;
             }
             if (options.entryPack === false) {
                 tasks[2] = false;
-                tasks[6] = false;
+                tasks[7] = false;
             }
             if (options.jsPack === false) {
                 tasks[3] = false;
-                tasks[7] = false;
+                tasks[8] = false;
             }
             if (options.cssPack === false) {
                 tasks[4] = false;
