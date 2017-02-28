@@ -96,6 +96,12 @@ dir: './app-release',
 notMerge: ['jquery'],
 ```
 
+#### copy
+
+类型 ：`Array`  默认值：`[]`
+
+使用 `grunt-contrib-copy` 插件拷贝文件，通常用于将包管理器维护的第三方库拷贝到指定的目录
+
 #### clean
 
 类型：`Array` 默认值：`[]`
